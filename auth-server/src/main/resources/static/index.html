@@ -19,15 +19,18 @@
 		<div>
 			With Facebook: <a href="/login/facebook">click here</a>
 		</div>
-		<div>
-			With Github: <a href="/login/github">click here</a>
-		</div>
 	</div>
 	<div class="container" ng-show="home.authenticated">
 		Logged in as: <span ng-bind="home.user"></span>
 		<div>
 			<button ng-click="home.logout()" class="btn btn-primary">Logout</button>
+			<button ng-click="home.test()" class="btn btn-primary">Test</button>
 		</div>
+
+        <br/>
+        Returned data JSON Data: <br/>
+        {{result}}
+
 	</div>
 	<script type="text/javascript" src="/webjars/angularjs/angular.min.js"></script>
 	<script type="text/javascript">
@@ -36,8 +39,9 @@
 				.config(
 						function($httpProvider) {
 							$httpProvider.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
-						}).controller("home", function($http, $location) {
+						}).controller("home", function($http, $location, $scope) {
 					var self = this;
+                    $scope.result= '';
 					$http.get("/user").success(function(data) {
 						if (data.name) {
 							self.user = data.name;
@@ -59,6 +63,13 @@
 							self.authenticated = false;
 						});
 					};
+                    self.test = function() {
+                        $http.get('/test', {}).success(function(data) {
+                            $scope.result = data;
+                        }).error(function(data) {
+                            $scope.result = data;
+                        });
+                    };
 				});
 	</script>
 </body>

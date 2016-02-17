@@ -29,6 +29,10 @@ import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import com.example.domain.TokenMapping;
+import com.example.domain.User;
+import com.example.domain.types.AccessProvider;
+import com.example.repository.UserRepositoryService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -51,12 +55,18 @@ import org.springframework.security.oauth2.config.annotation.web.configuration.E
 import org.springframework.security.oauth2.config.annotation.web.configuration.EnableOAuth2Client;
 import org.springframework.security.oauth2.config.annotation.web.configuration.EnableResourceServer;
 import org.springframework.security.oauth2.config.annotation.web.configuration.ResourceServerConfigurerAdapter;
+import org.springframework.security.oauth2.provider.OAuth2Authentication;
+import org.springframework.security.oauth2.provider.authentication.OAuth2AuthenticationDetails;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
 import org.springframework.security.web.authentication.www.BasicAuthenticationFilter;
 import org.springframework.security.web.csrf.CsrfFilter;
 import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.security.web.csrf.CsrfTokenRepository;
 import org.springframework.security.web.csrf.HttpSessionCsrfTokenRepository;
+import org.springframework.social.connect.Connection;
+import org.springframework.social.facebook.api.Facebook;
+import org.springframework.social.facebook.connect.FacebookConnectionFactory;
+import org.springframework.social.oauth2.AccessGrant;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.filter.CompositeFilter;
@@ -73,11 +83,55 @@ public class SocialApplication extends WebSecurityConfigurerAdapter {
 	@Autowired
 	OAuth2ClientContext oauth2ClientContext;
 
+	@Autowired
+	UserRepositoryService userRepositoryService;
+
 	@RequestMapping({ "/user", "/me" })
-	public Map<String, String> user(Principal principal) {
-		Map<String, String> map = new LinkedHashMap<>();
-		map.put("name", principal.getName());
-		return map;
+	public User user(Principal principal) {
+		//TODO : Check if user logged in via Facebook, then:
+		@SuppressWarnings("unchecked")
+		LinkedHashMap<String, String> userDetails = (LinkedHashMap<String, String>) (((OAuth2Authentication) principal).getUserAuthentication()).getDetails();
+		String tokenValue = ((OAuth2AuthenticationDetails) ((OAuth2Authentication) principal).getDetails()).getTokenValue();
+
+		User user = userRepositoryService.findByFacebookId(userDetails.get("id"));
+		if(user == null) { //create user if not exists
+			user = new User(userDetails.get("id"),
+					userDetails.get("first_name") + " " + userDetails.get("last_name"),
+					userDetails.get("link"), /* TODO: email here */
+					"imageUrl");
+
+			List<TokenMapping> tokenMappings = new ArrayList<>();
+			tokenMappings.add(TokenMapping.newFacebookTokenMapping(tokenValue));
+			user.setTokenMappings(tokenMappings);
+			userRepositoryService.save(user);
+		}
+		return user;
+	}
+
+	/**
+	 * Use the users' mapped fb token to access their facebook and fetch data
+	 */
+	@RequestMapping("/test")
+	public org.springframework.social.facebook.api.User test(Principal principal){
+		User user = userRepositoryService.findByFacebookId(principal.getName());
+		if(user != null) {
+			String accessToken = null;
+			for (TokenMapping tokenMapping : user.getTokenMappings()) {
+				if (tokenMapping.getAccessProvider() == AccessProvider.FACEBOOK) {
+					accessToken = tokenMapping.getAccessToken();
+				}
+			}
+
+			if(accessToken != null){
+				FacebookConnectionFactory connectionFactory
+						= new FacebookConnectionFactory("233668646673605", "33b17e044ee6a4fa383f46ec6e28ea1d");
+				AccessGrant accessGrant = new AccessGrant(accessToken);
+				Connection<Facebook> connection = connectionFactory.createConnection(accessGrant);
+				org.springframework.social.facebook.api.User fbUser = connection.getApi().userOperations().getUserProfile();
+				return fbUser;
+			}
+		}
+		return null;
 	}
 
 	@Override
