@@ -1,5 +1,11 @@
-:star: {asterisk}
-:all: {asterisk}{asterisk}
+How to run:
+
+1. Run the application by mvn spring-boot:run
+2. Navigate to http://localhost:8080
+3. Click on the login with facebook link and log in the application.
+4. After logging in, a button "Test" will be available, click this button to retrieve public profile information for facebook via the facebook access token that was stored when you logged in the application.
+
+Note: Please wait while the JSON data is returned and displayed on the page, no "loading" feedback is implemented at the moment.
 
 [[_social_login_authserver]]
 = Hosting an Authorization Server
